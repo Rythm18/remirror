@@ -17,7 +17,30 @@ import {
   DocumentDiffResult,
 } from './document-diff-types';
 
-export interface DocumentDiffExtensionOptions extends DocumentDiffOptions {}
+export interface DocumentDiffExtensionOptions {
+  /**
+   * Maximum depth to traverse when comparing documents (-1 for unlimited)
+   * @default -1
+   */
+  maxDepth?: number;
+
+  /**
+   * Whether to compare node attributes
+   * @default true
+   */
+  compareAttributes?: boolean;
+
+  /**
+   * Whether to compare node marks
+   * @default true
+   */
+  compareMarks?: boolean;
+
+  /**
+   * Custom equality function for comparing nodes (optional, not used in default options)
+   */
+  isEqual?: (a: ProsemirrorNode, b: ProsemirrorNode) => boolean;
+}
 
 /**
  * Extension for comparing ProseMirror documents and computing structured diffs.
