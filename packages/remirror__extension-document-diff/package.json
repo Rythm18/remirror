@@ -38,7 +38,7 @@
   ],
   "scripts": {
     "build": "remirror-cli build",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --verbose"
+    "test": "jest"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.0",
