@@ -128,20 +128,26 @@ describe('DocumentDiffExtension', () => {
     });
 
     it('should ignore attribute changes when compareAttributes is disabled', () => {
-      const extension = new DocumentDiffExtension({ compareAttributes: false });
       const { manager } = renderEditor([extension]);
       
       // Create documents with different heading levels (attributes differ)
       const docA = doc(h1('Same text'));
       const docB = doc(h2('Same text'));
 
-      const resultWithCheck = manager.store.helpers.compareDocuments(docA, docB);
-      const resultWithoutCheck = manager.store.helpers.compareDocuments(docA, docB, { compareAttributes: false });
+      // With compareAttributes enabled (default), should detect differences
+      const resultWithAttributes = manager.store.helpers.compareDocuments(docA, docB);
+      
+      // With compareAttributes disabled, attribute differences should be ignored
+      const resultWithoutAttributes = manager.store.helpers.compareDocuments(docA, docB, { compareAttributes: false });
 
-      // When compareAttributes is false, should have fewer or equal differences
-      // since attribute differences are ignored
-      expect(resultWithoutCheck).toBeDefined();
-      expect(typeof resultWithoutCheck.identical).toBe('boolean');
+      // When attributes are checked, documents with different heading levels are different
+      expect(resultWithAttributes.identical).toBe(false);
+      
+      // When attributes are ignored, the difference count should be less or documents may be identical
+      // (depending on how implementation treats type differences vs attribute differences)
+      expect(resultWithoutAttributes.insertions + resultWithoutAttributes.deletions).toBeLessThanOrEqual(
+        resultWithAttributes.insertions + resultWithAttributes.deletions
+      );
     });
 
     it('should handle nested list structures', () => {
@@ -167,22 +173,24 @@ describe('DocumentDiffExtension', () => {
     });
 
     it('should respect maxDepth option', () => {
-      const extension = new DocumentDiffExtension({ maxDepth: 1 });
       const { manager } = renderEditor([extension]);
       
-      // Nested structure: bulletList > listItem > paragraph > text
-      const docA = doc(bulletList(listItem(p('Item 1'))));
-      const docB = doc(bulletList(listItem(p('Item 2'))));
+      // Deep nested structure: doc > bulletList > listItem > paragraph > text
+      const docA = doc(bulletList(listItem(p('Deep item A'))));
+      const docB = doc(bulletList(listItem(p('Deep item B'))));
 
-      // With limited depth, comparison stops at certain level
+      // With limited depth, comparison stops early and may miss deeper differences
       const resultLimitedDepth = manager.store.helpers.compareDocuments(docA, docB, { maxDepth: 1 });
+      
+      // With full depth, comparison traverses entire tree
       const resultFullDepth = manager.store.helpers.compareDocuments(docA, docB, { maxDepth: -1 });
 
-      // Both should complete, but may have different operation counts
-      expect(resultLimitedDepth).toBeDefined();
-      expect(resultFullDepth).toBeDefined();
-      expect(typeof resultLimitedDepth.identical).toBe('boolean');
-      expect(typeof resultFullDepth.identical).toBe('boolean');
+      // Full depth should detect the text differences deep in the tree
+      expect(resultFullDepth.identical).toBe(false);
+      expect(resultFullDepth.insertions + resultFullDepth.deletions).toBeGreaterThan(0);
+      
+      // Limited depth may see fewer operations or even appear identical if depth stops before differences
+      expect(resultLimitedDepth.operations.length).toBeLessThanOrEqual(resultFullDepth.operations.length);
     });
 
     it('should handle empty documents', () => {
