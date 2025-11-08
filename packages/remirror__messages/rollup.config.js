@@ -1,6 +1,8 @@
 import { defineConfig } from 'rollup';
+import { createRequire } from 'module';
 
-import packageJson from './package.json' assert { type: 'json' };
+const require = createRequire(import.meta.url);
+const packageJson = require('./package.json');
 
 const dependencies = Object.keys({
   ...packageJson.dependencies,
