@@ -20,13 +20,13 @@ case "$COMMAND" in
   base)
     echo "Running base repository tests..."
     echo "========================================"
-    pnpm test --filter='@remirror/extension-count' --coverage=false
+    pnpm test --filter='@remirror/extension-count' -- --coverage=false
     ;;
     
   new)
     echo "Running new document-diff feature tests..."
     echo "========================================"
-    pnpm test --filter='@remirror/extension-document-diff' --coverage=false
+    pnpm test --filter='@remirror/extension-document-diff' -- --coverage=false
     ;;
     
   *)
