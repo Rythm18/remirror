@@ -1,0 +1,14 @@
+{
+  "extends": "../../../support/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["es2020", "dom"],
+    "rootDir": ".",
+    "outDir": "../dist-types"
+  },
+  "include": ["."],
+  "references": [
+    {
+      "path": "../../remirror__core/src"
+    }
+  ]
+}
