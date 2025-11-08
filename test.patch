@@ -455,30 +455,12 @@ index 000000000..67bdc15be
 +    }
 +  ]
 +}
-diff --git a/packages/remirror__extension-document-diff/jest.config.cjs b/packages/remirror__extension-document-diff/jest.config.cjs
-new file mode 100644
-index 000000000..5685770d1
---- /dev/null
-+++ b/packages/remirror__extension-document-diff/jest.config.cjs
-@@ -0,0 +1,12 @@
-+// Jest configuration for document-diff extension
-+module.exports = {
-+  clearMocks: true,
-+  verbose: true,
-+  testEnvironment: 'jsdom',
-+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'mjs'],
-+  transform: {
-+    '^.+\\.(js|jsx|ts|tsx|mjs)$': ['@swc/jest'],
-+  },
-+  testRegex: '/__tests__/.*\\.spec\\.tsx?$',
-+  moduleDirectories: ['node_modules', '<rootDir>/../../node_modules'],
-+};
 diff --git a/packages/remirror__extension-document-diff/package.json b/packages/remirror__extension-document-diff/package.json
 new file mode 100644
-index 000000000..5c62a9834
+index 000000000..dadcb4f61
 --- /dev/null
 +++ b/packages/remirror__extension-document-diff/package.json
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,71 @@
 +{
 +  "name": "@remirror/extension-document-diff",
 +  "version": "3.0.0",
@@ -518,8 +500,7 @@ index 000000000..5c62a9834
 +    "dist-types"
 +  ],
 +  "scripts": {
-+    "build": "remirror-cli build",
-+    "test": "jest"
++    "build": "remirror-cli build"
 +  },
 +  "dependencies": {
 +    "@babel/runtime": "^7.27.0",
@@ -553,7 +534,7 @@ index 000000000..5c62a9834
 +}
 diff --git a/test.sh b/test.sh
 new file mode 100755
-index 000000000..7f9fdc3c1
+index 000000000..1ee9a8fae
 --- /dev/null
 +++ b/test.sh
 @@ -0,0 +1,40 @@
@@ -579,13 +560,13 @@ index 000000000..7f9fdc3c1
 +  base)
 +    echo "Running base repository tests..."
 +    echo "========================================"
-+    pnpm test --filter='@remirror/extension-count'
++    pnpm test -- count-extension --coverage=false
 +    ;;
 +    
 +  new)
 +    echo "Running new document-diff feature tests..."
 +    echo "========================================"
-+    pnpm test --filter='@remirror/extension-document-diff'
++    pnpm test -- document-diff-extension --coverage=false
 +    ;;
 +    
 +  *)
