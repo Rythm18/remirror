@@ -457,7 +457,7 @@ index 000000000..67bdc15be
 +}
 diff --git a/packages/remirror__extension-document-diff/package.json b/packages/remirror__extension-document-diff/package.json
 new file mode 100644
-index 000000000..515564198
+index 000000000..5c62a9834
 --- /dev/null
 +++ b/packages/remirror__extension-document-diff/package.json
 @@ -0,0 +1,72 @@
@@ -501,7 +501,7 @@ index 000000000..515564198
 +  ],
 +  "scripts": {
 +    "build": "remirror-cli build",
-+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --verbose"
++    "test": "jest"
 +  },
 +  "dependencies": {
 +    "@babel/runtime": "^7.27.0",
