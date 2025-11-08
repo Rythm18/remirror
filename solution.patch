@@ -165,10 +165,10 @@ index 000000000..d59ee333e
 +MIT
 diff --git a/packages/remirror__extension-document-diff/src/document-diff-extension.ts b/packages/remirror__extension-document-diff/src/document-diff-extension.ts
 new file mode 100644
-index 000000000..b4cb698bc
+index 000000000..62fb9ece5
 --- /dev/null
 +++ b/packages/remirror__extension-document-diff/src/document-diff-extension.ts
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,266 @@
 +import {
 +  command,
 +  CommandFunction,
@@ -188,7 +188,30 @@ index 000000000..b4cb698bc
 +  DocumentDiffResult,
 +} from './document-diff-types';
 +
-+export interface DocumentDiffExtensionOptions extends DocumentDiffOptions {}
++export interface DocumentDiffExtensionOptions {
++  /**
++   * Maximum depth to traverse when comparing documents (-1 for unlimited)
++   * @default -1
++   */
++  maxDepth?: number;
++
++  /**
++   * Whether to compare node attributes
++   * @default true
++   */
++  compareAttributes?: boolean;
++
++  /**
++   * Whether to compare node marks
++   * @default true
++   */
++  compareMarks?: boolean;
++
++  /**
++   * Custom equality function for comparing nodes (optional, not used in default options)
++   */
++  isEqual?: (a: ProsemirrorNode, b: ProsemirrorNode) => boolean;
++}
 +
 +/**
 + * Extension for comparing ProseMirror documents and computing structured diffs.
@@ -814,21 +837,27 @@ index 000000000..3477d6da9
 +}
 diff --git a/packages/remirror__extension-document-diff/src/tsconfig.json b/packages/remirror__extension-document-diff/src/tsconfig.json
 new file mode 100644
-index 000000000..6a72a029f
+index 000000000..047499b4e
 --- /dev/null
 +++ b/packages/remirror__extension-document-diff/src/tsconfig.json
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,20 @@
 +{
-+  "extends": "../../../support/tsconfig/base.json",
++  "extends": "../../../support/tsconfig.base.json",
 +  "compilerOptions": {
-+    "lib": ["es2020", "dom"],
-+    "rootDir": ".",
++    "types": [],
++    "declaration": true,
++    "composite": true,
++    "noEmit": false,
++    "emitDeclarationOnly": true,
 +    "outDir": "../dist-types"
 +  },
-+  "include": ["."],
++  "include": ["./"],
 +  "references": [
 +    {
 +      "path": "../../remirror__core/src"
++    },
++    {
++      "path": "../../remirror__pm/src"
 +    }
 +  ]
 +}

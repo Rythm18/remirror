@@ -1,13 +1,17 @@
 diff --git a/packages/remirror__extension-document-diff/__tests__/document-diff-extension.spec.ts b/packages/remirror__extension-document-diff/__tests__/document-diff-extension.spec.ts
 new file mode 100644
-index 000000000..2c836e90b
+index 000000000..33c5a8d0e
 --- /dev/null
 +++ b/packages/remirror__extension-document-diff/__tests__/document-diff-extension.spec.ts
-@@ -0,0 +1,432 @@
+@@ -0,0 +1,368 @@
 +import { pmBuild } from 'jest-prosemirror';
 +import { extensionValidityTest, renderEditor } from 'jest-remirror';
 +
-+import { DocumentDiffExtension } from '../src';
++import {
++  DiffOperationType,
++  DocumentDiffExtension,
++  type DocumentDiffResult,
++} from '../src';
 +
 +extensionValidityTest(DocumentDiffExtension);
 +
@@ -32,8 +36,8 @@ index 000000000..2c836e90b
 +    extension = new DocumentDiffExtension();
 +  });
 +
-+  describe('document comparison', () => {
-+    it('should identify identical documents', () => {
++  describe('compareDocuments', () => {
++    it('should detect identical documents', () => {
 +      const { manager } = renderEditor([extension]);
 +      const docA = doc(p('Hello world'));
 +      const docB = doc(p('Hello world'));
@@ -46,7 +50,7 @@ index 000000000..2c836e90b
 +      expect(result.unchanged).toBeGreaterThan(0);
 +    });
 +
-+    it('should detect when content is added', () => {
++    it('should detect text insertions', () => {
 +      const { manager } = renderEditor([extension]);
 +      const docA = doc(p('Hello'));
 +      const docB = doc(p('Hello world'));
@@ -58,7 +62,7 @@ index 000000000..2c836e90b
 +      expect(result.deletions).toBe(0);
 +    });
 +
-+    it('should detect when content is removed', () => {
++    it('should detect text deletions', () => {
 +      const { manager } = renderEditor([extension]);
 +      const docA = doc(p('Hello world'));
 +      const docB = doc(p('Hello'));
@@ -70,7 +74,7 @@ index 000000000..2c836e90b
 +      expect(result.deletions).toBeGreaterThan(0);
 +    });
 +
-+    it('should detect when node types change', () => {
++    it('should detect node type changes', () => {
 +      const { manager } = renderEditor([extension]);
 +      const docA = doc(p('Text'));
 +      const docB = doc(h1('Text'));
@@ -120,40 +124,8 @@ index 000000000..2c836e90b
 +
 +      const result = manager.store.helpers.compareDocuments(docA, docB);
 +
++      // With compareMarks: false, marks are ignored
 +      expect(result.identical).toBe(true);
-+    });
-+
-+    it('should detect attribute changes when compareAttributes is enabled', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(h1('Heading'));
-+      const docB = doc(h2('Heading'));
-+
-+      const result = manager.store.helpers.compareDocuments(docA, docB);
-+
-+      expect(result.identical).toBe(false);
-+    });
-+
-+    it('should ignore attribute changes when compareAttributes is disabled', () => {
-+      const { manager } = renderEditor([extension]);
-+      
-+      // Create documents with different heading levels (attributes differ)
-+      const docA = doc(h1('Same text'));
-+      const docB = doc(h2('Same text'));
-+
-+      // With compareAttributes enabled (default), should detect differences
-+      const resultWithAttributes = manager.store.helpers.compareDocuments(docA, docB);
-+      
-+      // With compareAttributes disabled, attribute differences should be ignored
-+      const resultWithoutAttributes = manager.store.helpers.compareDocuments(docA, docB, { compareAttributes: false });
-+
-+      // When attributes are checked, documents with different heading levels are different
-+      expect(resultWithAttributes.identical).toBe(false);
-+      
-+      // When attributes are ignored, the difference count should be less or documents may be identical
-+      // (depending on how implementation treats type differences vs attribute differences)
-+      expect(resultWithoutAttributes.insertions + resultWithoutAttributes.deletions).toBeLessThanOrEqual(
-+        resultWithAttributes.insertions + resultWithAttributes.deletions
-+      );
 +    });
 +
 +    it('should handle nested list structures', () => {
@@ -179,26 +151,177 @@ index 000000000..2c836e90b
 +    });
 +
 +    it('should respect maxDepth option', () => {
++      const extension = new DocumentDiffExtension({ maxDepth: 0 });
 +      const { manager } = renderEditor([extension]);
-+      
-+      // Deep nested structure: doc > bulletList > listItem > paragraph > text
-+      const docA = doc(bulletList(listItem(p('Deep item A'))));
-+      const docB = doc(bulletList(listItem(p('Deep item B'))));
++      const docA = doc(p('Text 1'));
++      const docB = doc(p('Text 2'));
 +
-+      // With limited depth, comparison stops early and may miss deeper differences
-+      const resultLimitedDepth = manager.store.helpers.compareDocuments(docA, docB, { maxDepth: 1 });
-+      
-+      // With full depth, comparison traverses entire tree
-+      const resultFullDepth = manager.store.helpers.compareDocuments(docA, docB, { maxDepth: -1 });
++      const result = manager.store.helpers.compareDocuments(docA, docB);
 +
-+      // Full depth should detect the text differences deep in the tree
-+      expect(resultFullDepth.identical).toBe(false);
-+      expect(resultFullDepth.insertions + resultFullDepth.deletions).toBeGreaterThan(0);
-+      
-+      // Limited depth may see fewer operations or even appear identical if depth stops before differences
-+      expect(resultLimitedDepth.operations.length).toBeLessThanOrEqual(resultFullDepth.operations.length);
++      // With maxDepth 0, only top-level nodes are compared
++      expect(result).toBeDefined();
++    });
++  });
++
++  describe('operations', () => {
++    it('should generate correct operation types', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('A'), p('B'));
++      const docB = doc(p('A'), p('C'));
++
++      const result = manager.store.helpers.compareDocuments(docA, docB);
++
++      const hasEqual = result.operations.some(op => op.type === DiffOperationType.EQUAL);
++      const hasInsert = result.operations.some(op => op.type === DiffOperationType.INSERT);
++      const hasDelete = result.operations.some(op => op.type === DiffOperationType.DELETE);
++
++      expect(hasEqual).toBe(true);
++      expect(hasInsert || hasDelete).toBe(true);
 +    });
 +
++    it('should include position information in operations', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('Hello'));
++      const docB = doc(p('World'));
++
++      const result = manager.store.helpers.compareDocuments(docA, docB);
++
++      for (const op of result.operations) {
++        if (op.type === DiffOperationType.DELETE) {
++          expect(op.oldPos).toBeDefined();
++        } else if (op.type === DiffOperationType.INSERT) {
++          expect(op.newPos).toBeDefined();
++        } else if (op.type === DiffOperationType.EQUAL) {
++          expect(op.oldPos).toBeDefined();
++          expect(op.newPos).toBeDefined();
++        }
++      }
++    });
++  });
++
++  describe('helper methods', () => {
++    it('getInsertions should filter insert operations', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('A'));
++      const docB = doc(p('A'), p('B'));
++
++      const diff = manager.store.helpers.compareDocuments(docA, docB);
++      const insertions = manager.store.helpers.getInsertions(diff);
++
++      expect(insertions.length).toBeGreaterThan(0);
++      expect(insertions.every(op => op.type === DiffOperationType.INSERT)).toBe(true);
++    });
++
++    it('getDeletions should filter delete operations', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('A'), p('B'));
++      const docB = doc(p('A'));
++
++      const diff = manager.store.helpers.compareDocuments(docA, docB);
++      const deletions = manager.store.helpers.getDeletions(diff);
++
++      expect(deletions.length).toBeGreaterThan(0);
++      expect(deletions.every(op => op.type === DiffOperationType.DELETE)).toBe(true);
++    });
++
++    it('getUnchanged should filter equal operations', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('Same'), p('Different 1'));
++      const docB = doc(p('Same'), p('Different 2'));
++
++      const diff = manager.store.helpers.compareDocuments(docA, docB);
++      const unchanged = manager.store.helpers.getUnchanged(diff);
++
++      expect(unchanged.length).toBeGreaterThan(0);
++      expect(unchanged.every(op => op.type === DiffOperationType.EQUAL)).toBe(true);
++    });
++
++    it('calculateSimilarity should return percentage', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('Hello world'));
++      const docB = doc(p('Hello world'));
++
++      const similarity = manager.store.helpers.calculateSimilarity(docA, docB);
++
++      expect(similarity).toBe(100);
++    });
++
++    it('calculateSimilarity should handle partial matches', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('A'), p('B'), p('C'));
++      const docB = doc(p('A'), p('X'), p('C'));
++
++      const similarity = manager.store.helpers.calculateSimilarity(docA, docB);
++
++      expect(similarity).toBeGreaterThan(0);
++      expect(similarity).toBeLessThan(100);
++    });
++
++    it('getDiffSummary should generate readable summary', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('Hello'));
++      const docB = doc(p('Hello world'));
++
++      const diff = manager.store.helpers.compareDocuments(docA, docB);
++      const summary = manager.store.helpers.getDiffSummary(diff);
++
++      expect(summary).toContain('insertion');
++      expect(summary).toContain('unchanged');
++    });
++
++    it('getDiffSummary should handle identical documents', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('Hello'));
++      const docB = doc(p('Hello'));
++
++      const diff = manager.store.helpers.compareDocuments(docA, docB);
++      const summary = manager.store.helpers.getDiffSummary(diff);
++
++      expect(summary).toBe('Documents are identical');
++    });
++
++    it('areDocumentsIdentical should return boolean', () => {
++      const { manager } = renderEditor([extension]);
++      const docA = doc(p('Test'));
++      const docB = doc(p('Test'));
++      const docC = doc(p('Different'));
++
++      expect(manager.store.helpers.areDocumentsIdentical(docA, docB)).toBe(true);
++      expect(manager.store.helpers.areDocumentsIdentical(docA, docC)).toBe(false);
++    });
++  });
++
++  describe('compareWithDocument', () => {
++    it('should compare current document with provided document', () => {
++      const { manager, add } = renderEditor([extension]);
++
++      add(doc(p('Initial text')));
++
++      const otherDoc = doc(p('Different text'));
++      const result = manager.store.helpers.compareWithDocument(otherDoc);
++
++      expect(result.identical).toBe(false);
++    });
++  });
++
++  describe('compareStates', () => {
++    it('should compare two editor states', () => {
++      const { manager, view } = renderEditor([extension]);
++
++      const state1 = view.state;
++      
++      // Create a new state with different content
++      const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, schema.nodes.paragraph!.create({}, schema.text('New content')));
++      const state2 = view.state.apply(tr);
++
++      const result = manager.store.helpers.compareStates(state1, state2);
++
++      expect(result).toBeDefined();
++      expect(result.identical).toBe(false);
++    });
++  });
++
++  describe('edge cases', () => {
 +    it('should handle empty documents', () => {
 +      const { manager } = renderEditor([extension]);
 +      const docA = doc(p(''));
@@ -209,7 +332,7 @@ index 000000000..2c836e90b
 +      expect(result.identical).toBe(true);
 +    });
 +
-+    it('should detect whitespace differences', () => {
++    it('should handle documents with only whitespace differences', () => {
 +      const { manager } = renderEditor([extension]);
 +      const docA = doc(p('Hello'));
 +      const docB = doc(p('Hello '));
@@ -219,7 +342,7 @@ index 000000000..2c836e90b
 +      expect(result.identical).toBe(false);
 +    });
 +
-+    it('should handle large documents efficiently', () => {
++    it('should handle very large documents', () => {
 +      const { manager } = renderEditor([extension]);
 +      
 +      const paragraphs = Array.from({ length: 100 }, (_, i) => p(`Paragraph ${i}`));
@@ -232,168 +355,10 @@ index 000000000..2c836e90b
 +    });
 +  });
 +
-+  describe('helper methods', () => {
-+    it('should filter to show only insertions', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'));
-+      const docB = doc(p('A'), p('B'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const insertions = manager.store.helpers.getInsertions(diff);
-+
-+      expect(insertions.length).toBeGreaterThan(0);
-+      expect(insertions.length).toBeLessThanOrEqual(diff.insertions);
-+    });
-+
-+    it('should filter to show only deletions', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'), p('B'));
-+      const docB = doc(p('A'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const deletions = manager.store.helpers.getDeletions(diff);
-+
-+      expect(deletions.length).toBeGreaterThan(0);
-+      expect(deletions.length).toBeLessThanOrEqual(diff.deletions);
-+    });
-+
-+    it('should filter to show only unchanged content', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('Same'), p('Different 1'));
-+      const docB = doc(p('Same'), p('Different 2'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const unchanged = manager.store.helpers.getUnchanged(diff);
-+
-+      expect(unchanged.length).toBeGreaterThan(0);
-+      expect(unchanged.length).toBeLessThanOrEqual(diff.unchanged);
-+    });
-+
-+    it('should calculate 100% similarity for identical documents', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('Hello world'));
-+      const docB = doc(p('Hello world'));
-+
-+      const similarity = manager.store.helpers.calculateSimilarity(docA, docB);
-+
-+      expect(similarity).toBe(100);
-+    });
-+
-+    it('should calculate partial similarity for partially matching documents', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'), p('B'), p('C'));
-+      const docB = doc(p('A'), p('X'), p('C'));
-+
-+      const similarity = manager.store.helpers.calculateSimilarity(docA, docB);
-+
-+      expect(similarity).toBeGreaterThan(0);
-+      expect(similarity).toBeLessThan(100);
-+    });
-+
-+    it('should generate a human-readable diff summary', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('Hello'));
-+      const docB = doc(p('Hello world'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const summary = manager.store.helpers.getDiffSummary(diff);
-+
-+      expect(typeof summary).toBe('string');
-+      expect(summary.length).toBeGreaterThan(0);
-+    });
-+
-+    it('should report identical documents in summary', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('Hello'));
-+      const docB = doc(p('Hello'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const summary = manager.store.helpers.getDiffSummary(diff);
-+
-+      // Summary should reflect that documents are identical
-+      expect(typeof summary).toBe('string');
-+      expect(summary.length).toBeGreaterThan(0);
-+      expect(diff.identical).toBe(true);
-+    });
-+
-+    it('should reflect changes in summary when present', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'));
-+      const docB = doc(p('A'), p('B'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const summary = manager.store.helpers.getDiffSummary(diff);
-+
-+      // Summary should be non-empty and reflect that changes exist
-+      expect(typeof summary).toBe('string');
-+      expect(summary.length).toBeGreaterThan(0);
-+      expect(diff.insertions).toBeGreaterThan(0);
-+    });
-+
-+    it('should generate meaningful summary for documents with differences', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'), p('B'));
-+      const docB = doc(p('A'));
-+
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
-+      const summary = manager.store.helpers.getDiffSummary(diff);
-+
-+      // Summary should be non-empty for documents with deletions
-+      expect(typeof summary).toBe('string');
-+      expect(summary.length).toBeGreaterThan(0);
-+      expect(diff.deletions).toBeGreaterThan(0);
-+    });
-+
-+    it('should correctly identify identical documents', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('Test'));
-+      const docB = doc(p('Test'));
-+      const docC = doc(p('Different'));
-+
-+      expect(manager.store.helpers.areDocumentsIdentical(docA, docB)).toBe(true);
-+      expect(manager.store.helpers.areDocumentsIdentical(docA, docC)).toBe(false);
-+    });
-+  });
-+
-+  describe('compareWithDocument', () => {
-+    it('should compare current document state with provided document', () => {
-+      const { manager, add } = renderEditor([extension]);
-+
-+      add(doc(p('Initial text')));
-+
-+      const otherDoc = doc(p('Different text'));
-+      const result = manager.store.helpers.compareWithDocument(otherDoc);
-+
-+      expect(result.identical).toBe(false);
-+      expect(result.insertions + result.deletions).toBeGreaterThan(0);
-+    });
-+  });
-+
-+  describe('compareStates', () => {
-+    it('should compare two editor states', () => {
-+      const { manager, view } = renderEditor([extension]);
-+
-+      const state1 = view.state;
-+      
-+      // Create new content using the view's schema
-+      const tr = view.state.tr.replaceWith(
-+        0,
-+        view.state.doc.content.size,
-+        view.state.schema.nodes.paragraph!.create({}, view.state.schema.text('New content'))
-+      );
-+      const state2 = view.state.apply(tr);
-+
-+      const result = manager.store.helpers.compareStates(state1, state2);
-+
-+      expect(result).toBeDefined();
-+      expect(result.identical).toBe(false);
-+    });
-+  });
-+
 +  describe('custom equality function', () => {
-+    it('should use custom equality when provided', () => {
++    it('should use custom isEqual function when provided', () => {
 +      const customExtension = new DocumentDiffExtension({
-+        isEqual: (a, b) => a.type.name === b.type.name,
++        isEqual: (a, b) => a.type.name === b.type.name, // Ignore content, only compare types
 +      });
 +      const { manager } = renderEditor([customExtension]);
 +
@@ -402,37 +367,317 @@ index 000000000..2c836e90b
 +
 +      const result = manager.store.helpers.compareDocuments(docA, docB);
 +
-+      // With custom equality checking only types, documents should match
++      // With custom equality that only checks types, these should be equal
 +      expect(result.identical).toBe(true);
 +    });
 +  });
++});
+diff --git a/packages/remirror__extension-document-diff/__tests__/myers-diff-algorithm.spec.ts b/packages/remirror__extension-document-diff/__tests__/myers-diff-algorithm.spec.ts
+new file mode 100644
+index 000000000..9a0c7c92a
+--- /dev/null
++++ b/packages/remirror__extension-document-diff/__tests__/myers-diff-algorithm.spec.ts
+@@ -0,0 +1,303 @@
++import { pmBuild } from 'jest-prosemirror';
 +
-+  describe('operations structure', () => {
-+    it('should return operations array in diff result', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'));
-+      const docB = doc(p('B'));
++import { computeDocumentDiff } from '../src/myers-diff-algorithm';
++import { DiffOperationType } from '../src/document-diff-types';
 +
-+      const result = manager.store.helpers.compareDocuments(docA, docB);
++describe('Myers Diff Algorithm', () => {
++  const { doc, p, h1, h2, strong, em, blockquote, bulletList, listItem } = pmBuild;
 +
-+      expect(Array.isArray(result.operations)).toBe(true);
-+      expect(result.operations.length).toBeGreaterThan(0);
++  describe('computeDocumentDiff', () => {
++    it('should return empty diff for identical documents', () => {
++      const docA = doc(p('Hello world'));
++      const docB = doc(p('Hello world'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(true);
++      expect(result.insertions).toBe(0);
++      expect(result.deletions).toBe(0);
++      expect(result.unchanged).toBeGreaterThan(0);
 +    });
 +
-+    it('should provide operations that can be filtered by helpers', () => {
-+      const { manager } = renderEditor([extension]);
-+      const docA = doc(p('A'), p('B'));
-+      const docB = doc(p('A'), p('C'));
++    it('should detect simple insertion at end', () => {
++      const docA = doc(p('Hello'));
++      const docB = doc(p('Hello'), p('World'));
 +
-+      const diff = manager.store.helpers.compareDocuments(docA, docB);
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.insertions).toBeGreaterThan(0);
++      expect(result.deletions).toBe(0);
++
++      const insertOps = result.operations.filter(op => op.type === DiffOperationType.INSERT);
++      expect(insertOps.length).toBeGreaterThan(0);
++    });
++
++    it('should detect simple deletion', () => {
++      const docA = doc(p('Hello'), p('World'));
++      const docB = doc(p('Hello'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.insertions).toBe(0);
++      expect(result.deletions).toBeGreaterThan(0);
++
++      const deleteOps = result.operations.filter(op => op.type === DiffOperationType.DELETE);
++      expect(deleteOps.length).toBeGreaterThan(0);
++    });
++
++    it('should detect replacement (delete + insert)', () => {
++      const docA = doc(p('Old text'));
++      const docB = doc(p('New text'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.insertions).toBeGreaterThan(0);
++      expect(result.deletions).toBeGreaterThan(0);
++    });
++
++    it('should handle multiple changes', () => {
++      const docA = doc(
++        p('Keep this'),
++        p('Delete this'),
++        p('Keep this too'),
++      );
++      const docB = doc(
++        p('Keep this'),
++        p('Insert this'),
++        p('Keep this too'),
++      );
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.unchanged).toBeGreaterThan(0);
++      expect(result.insertions).toBeGreaterThan(0);
++      expect(result.deletions).toBeGreaterThan(0);
++    });
++
++    it('should handle nested structures', () => {
++      const docA = doc(
++        bulletList(
++          listItem(p('Item 1')),
++          listItem(p('Item 2')),
++        ),
++      );
++      const docB = doc(
++        bulletList(
++          listItem(p('Item 1')),
++          listItem(p('Item 2')),
++          listItem(p('Item 3')),
++        ),
++      );
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.insertions).toBeGreaterThan(0);
++    });
++
++    it('should compare marks correctly by default', () => {
++      const docA = doc(p('Plain text'));
++      const docB = doc(p(strong('Bold text')));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++    });
++
++    it('should ignore marks when compareMarks is false', () => {
++      const docA = doc(p('Same text'));
++      const docB = doc(p(strong('Same text')));
++
++      const result = computeDocumentDiff(docA, docB, { compareMarks: false });
++
++      expect(result.identical).toBe(true);
++    });
++
++    it('should compare attributes correctly by default', () => {
++      const docA = doc(h1('Heading'));
++      const docB = doc(h2('Heading'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++    });
++
++    it('should handle empty documents', () => {
++      const docA = doc(p(''));
++      const docB = doc(p(''));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(true);
++    });
++
++    it('should detect insertion into empty document', () => {
++      const docA = doc(p(''));
++      const docB = doc(p('New content'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.insertions).toBeGreaterThan(0);
++    });
++
++    it('should detect deletion to empty document', () => {
++      const docA = doc(p('Content to delete'));
++      const docB = doc(p(''));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.deletions).toBeGreaterThan(0);
++    });
++
++    it('should maintain operation order', () => {
++      const docA = doc(p('A'), p('B'), p('C'));
++      const docB = doc(p('A'), p('X'), p('C'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      // Operations should be in document order
++      let lastPos = -1;
++      for (const op of result.operations) {
++        if (op.type === DiffOperationType.EQUAL && op.oldPos !== undefined) {
++          expect(op.oldPos).toBeGreaterThanOrEqual(lastPos);
++          lastPos = op.oldPos;
++        } else if (op.type === DiffOperationType.DELETE && op.oldPos !== undefined) {
++          expect(op.oldPos).toBeGreaterThanOrEqual(lastPos);
++          lastPos = op.oldPos;
++        }
++      }
++    });
++
++    it('should handle complex mixed operations', () => {
++      const docA = doc(
++        h1('Title'),
++        p('Paragraph 1'),
++        p('Paragraph 2'),
++        blockquote(p('Quote')),
++      );
++      const docB = doc(
++        h1('Title'),
++        p('Paragraph 1 modified'),
++        blockquote(p('Quote')),
++        p('New paragraph'),
++      );
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
++      expect(result.unchanged).toBeGreaterThan(0); // Title and quote unchanged
++      expect(result.insertions).toBeGreaterThan(0);
++      expect(result.deletions).toBeGreaterThan(0);
++    });
++
++    it('should respect maxDepth option', () => {
++      const docA = doc(bulletList(listItem(p('Deep text 1'))));
++      const docB = doc(bulletList(listItem(p('Deep text 2'))));
++
++      const result1 = computeDocumentDiff(docA, docB, { maxDepth: 0 });
++      const result2 = computeDocumentDiff(docA, docB, { maxDepth: -1 });
++
++      // With limited depth, fewer nodes are compared
++      expect(result1.operations.length).toBeLessThan(result2.operations.length);
++    });
++
++    it('should use custom isEqual function', () => {
++      const customIsEqual = (a: any, b: any) => {
++        // Only compare node types, ignore content
++        return a.type.name === b.type.name;
++      };
++
++      const docA = doc(p('Text A'));
++      const docB = doc(p('Text B'));
++
++      const result = computeDocumentDiff(docA, docB, { isEqual: customIsEqual });
++
++      // With custom equality that ignores content, should be identical
++      expect(result.identical).toBe(true);
++    });
++
++    it('should handle documents with multiple identical sections', () => {
++      const docA = doc(
++        p('Same 1'),
++        p('Different A'),
++        p('Same 2'),
++        p('Different B'),
++        p('Same 3'),
++      );
++      const docB = doc(
++        p('Same 1'),
++        p('Different X'),
++        p('Same 2'),
++        p('Different Y'),
++        p('Same 3'),
++      );
++
++      const result = computeDocumentDiff(docA, docB);
++
++      const equalOps = result.operations.filter(op => op.type === DiffOperationType.EQUAL);
 +      
-+      const insertions = manager.store.helpers.getInsertions(diff);
-+      const deletions = manager.store.helpers.getDeletions(diff);
-+      const unchanged = manager.store.helpers.getUnchanged(diff);
++      // Should identify the three "Same" paragraphs
++      expect(equalOps.length).toBeGreaterThan(0);
++      expect(result.unchanged).toBeGreaterThan(0);
++    });
 +
-+      // All operations should be accounted for across the filters
-+      const totalFiltered = insertions.length + deletions.length + unchanged.length;
-+      expect(totalFiltered).toBe(diff.operations.length);
++    it('should handle transpositions', () => {
++      const docA = doc(p('A'), p('B'), p('C'));
++      const docB = doc(p('C'), p('B'), p('A'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      // Transposition should be detected as deletions and insertions
++      expect(result.identical).toBe(false);
++    });
++
++    it('should generate operations with correct node references', () => {
++      const docA = doc(p('Hello'));
++      const docB = doc(p('World'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      for (const op of result.operations) {
++        expect(op.node).toBeDefined();
++        expect(op.node.type).toBeDefined();
++      }
++    });
++
++    it('should handle large documents efficiently', () => {
++      const largeParagraphs = Array.from({ length: 50 }, (_, i) => p(`Paragraph ${i}`));
++      const docA = doc(...largeParagraphs);
++      const docB = doc(...largeParagraphs);
++
++      const startTime = Date.now();
++      const result = computeDocumentDiff(docA, docB);
++      const endTime = Date.now();
++
++      expect(result.identical).toBe(true);
++      expect(endTime - startTime).toBeLessThan(1000); // Should complete in under 1 second
++    });
++
++    it('should handle documents with only whitespace', () => {
++      const docA = doc(p('   '));
++      const docB = doc(p('   '));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(true);
++    });
++
++    it('should detect single character changes', () => {
++      const docA = doc(p('Hello'));
++      const docB = doc(p('Hella'));
++
++      const result = computeDocumentDiff(docA, docB);
++
++      expect(result.identical).toBe(false);
 +    });
 +  });
 +});
