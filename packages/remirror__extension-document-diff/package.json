@@ -37,8 +37,7 @@
     "dist-types"
   ],
   "scripts": {
-    "build": "remirror-cli build",
-    "test": "jest"
+    "build": "remirror-cli build"
   },
   "dependencies": {
     "@babel/runtime": "^7.27.0",
