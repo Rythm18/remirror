@@ -27,4 +27,17 @@ The extension should handle edge cases like empty documents, large documents (50
 
 ## Test Assumptions
 
-The extension must be importable as `DocumentDiffExtension`. All functionality should be accessible through the standard Remirror helper API (`manager.store.helpers`). Diff results must include `operations` (array), `insertions` (number), `deletions` (number), `unchanged` (number), and `identical` (boolean) properties.
+The extension must be importable as `DocumentDiffExtension` from the package root. Configuration options must be named `compareMarks` (boolean, default true), `compareAttributes` (boolean, default true), `maxDepth` (number, default -1 for unlimited), and `isEqual` (optional custom equality function).
+
+Helper methods accessible via `manager.store.helpers`:
+- `compareDocuments(oldDoc, newDoc, options?)` - returns diff result
+- `compareWithDocument(otherDoc, options?)` - compares with current document
+- `compareStates(oldState, newState, options?)` - compares editor states
+- `getInsertions(diffResult)` - filters to insertion operations
+- `getDeletions(diffResult)` - filters to deletion operations  
+- `getUnchanged(diffResult)` - filters to unchanged operations
+- `calculateSimilarity(docA, docB, options?)` - returns percentage (0-100)
+- `getDiffSummary(diffResult)` - returns human-readable string
+- `areDocumentsIdentical(docA, docB, options?)` - returns boolean
+
+Diff results must include `operations` (array), `insertions` (number), `deletions` (number), `unchanged` (number), and `identical` (boolean) properties.
