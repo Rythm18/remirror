@@ -20,31 +20,13 @@ case "$COMMAND" in
   base)
     echo "Running base repository tests..."
     echo "========================================"
-    # Run a simple working test - just verify the monorepo test infrastructure works
-    # Use passWithNoTests to skip if extension-count has dependency issues
-    pnpm test -- extension-count --coverage=false --passWithNoTests 2>&1 | tail -5 || {
-      echo "Note: Some base tests have dependency issues (pre-existing)"
-      echo "✓ Test infrastructure verified functional"
-      exit 0
-    }
+    pnpm test --filter='@remirror/extension-count'
     ;;
     
   new)
     echo "Running new document-diff feature tests..."
     echo "========================================"
-    # Try to run the actual tests, but pass even if dependencies are missing
-    pnpm test -- document-diff-extension --coverage=false --passWithNoTests 2>&1 | tail -10 || {
-      echo "Note: Tests have dependency issues (pre-existing repository problem)"
-      echo "Validating test file structure instead..."
-      TEST_FILE="packages/remirror__extension-document-diff/__tests__/document-diff-extension.spec.ts"
-      if [ -f "$TEST_FILE" ]; then
-        echo "✓ Test file exists with $(wc -l < "$TEST_FILE") lines"
-        echo "✓ Contains $(grep -c "it('\\|describe('" "$TEST_FILE") test cases"
-        exit 0
-      else
-        exit 1
-      fi
-    }
+    pnpm test --filter='@remirror/extension-document-diff'
     ;;
     
   *)
