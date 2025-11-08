@@ -1,9 +1,9 @@
 diff --git a/packages/remirror__extension-document-diff/package.json b/packages/remirror__extension-document-diff/package.json
 new file mode 100644
-index 000000000..dadcb4f61
+index 000000000..515564198
 --- /dev/null
 +++ b/packages/remirror__extension-document-diff/package.json
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,72 @@
 +{
 +  "name": "@remirror/extension-document-diff",
 +  "version": "3.0.0",
@@ -43,7 +43,8 @@ index 000000000..dadcb4f61
 +    "dist-types"
 +  ],
 +  "scripts": {
-+    "build": "remirror-cli build"
++    "build": "remirror-cli build",
++    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --verbose"
 +  },
 +  "dependencies": {
 +    "@babel/runtime": "^7.27.0",
