@@ -455,6 +455,24 @@ index 000000000..67bdc15be
 +    }
 +  ]
 +}
+diff --git a/packages/remirror__extension-document-diff/jest.config.cjs b/packages/remirror__extension-document-diff/jest.config.cjs
+new file mode 100644
+index 000000000..5685770d1
+--- /dev/null
++++ b/packages/remirror__extension-document-diff/jest.config.cjs
+@@ -0,0 +1,12 @@
++// Jest configuration for document-diff extension
++module.exports = {
++  clearMocks: true,
++  verbose: true,
++  testEnvironment: 'jsdom',
++  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'mjs'],
++  transform: {
++    '^.+\\.(js|jsx|ts|tsx|mjs)$': ['@swc/jest'],
++  },
++  testRegex: '/__tests__/.*\\.spec\\.tsx?$',
++  moduleDirectories: ['node_modules', '<rootDir>/../../node_modules'],
++};
 diff --git a/packages/remirror__extension-document-diff/package.json b/packages/remirror__extension-document-diff/package.json
 new file mode 100644
 index 000000000..5c62a9834
